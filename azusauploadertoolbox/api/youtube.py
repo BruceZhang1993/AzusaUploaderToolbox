@@ -1,11 +1,11 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict, Any
 
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build, Resource
 from googleapiclient.http import MediaFileUpload
 
-from azusauploadertoolbox.api.BaseApi import BaseApi
+from azusauploadertoolbox.api.base import BaseApi, VideoProperty, PrivacyStatus
 from azusauploadertoolbox.dir import CACHE_DIR
 
 
@@ -38,21 +38,44 @@ class YoutubeApi(BaseApi):
     def has_credentials(self) -> bool:
         return self.TOKEN_FILE.exists()
 
-    def run(self) -> Tuple[bool, str]:
-        print(self.youtube.videos().insert(
-            part="snippet,status",
-            body={
-                "snippet": {
-                    "description": "Description of uploaded video.",
-                    "title": "Test video upload."
+    @property
+    def supported_video_properties(self) -> List[VideoProperty]:
+        return [VideoProperty.title, VideoProperty.description, VideoProperty.tags, VideoProperty.category,
+                VideoProperty.privacy]
+
+    def run(self, properties: Dict[VideoProperty, Any]) -> Tuple[bool, str]:
+        try:
+            body = {
+                'snippet': {
+                    'title': properties.get(VideoProperty.title, ''),
+                    'description': properties.get(VideoProperty.description, ''),
+                    'tags': properties.get(VideoProperty.tags, []),
+                    'categoryId': properties.get(VideoProperty.category),
+                    'defaultLanguage': 'zh_CN',
                 },
-                "status": {
-                    "privacyStatus": "private"
+                'status': {
+                    'privacyStatus': 'unlisted'
                 }
-            },
-            media_body=MediaFileUpload("FILE", resumable=True)
-        ).execute())
-        return True, 'success'
+            }
+            match properties.get(VideoProperty.privacy):
+                case PrivacyStatus.public:
+                    body['status']['privacyStatus'] = 'public'
+                case PrivacyStatus.private:
+                    body['status']['privacyStatus'] = 'private'
+            request = self.youtube.videos().insert(
+                part='snippet,status',
+                body=body,
+                media_body=MediaFileUpload(properties.get(VideoProperty.filepath, ''), resumable=True)
+            )
+            response = None
+            while response is None:
+                status, response = request.next_chunk()
+                if status:
+                    print(status.progress() * 100)
+            print(response)
+            return True, 'success'
+        except Exception as e:
+            return False, str(e)
 
     def load_credentials(self) -> None:
         if not self.TOKEN_FILE.exists():
@@ -80,4 +103,11 @@ if __name__ == '__main__':
     api = YoutubeApi()
     if api.has_credentials:
         api.load_credentials()
-        api.run()
+        print(api.run({
+            VideoProperty.filepath: 'C:\\Users\\bruce\\Documents\\小海梓模型配布\\out.avi',
+            VideoProperty.title: 'azi',
+            VideoProperty.description: 'test video upload',
+            VideoProperty.tags: ['azusa'],
+            VideoProperty.privacy: PrivacyStatus.private,
+            VideoProperty.category: '22',
+        }))

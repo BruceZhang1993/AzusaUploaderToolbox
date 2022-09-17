@@ -1,7 +1,23 @@
 import socket
 from abc import ABCMeta, abstractmethod, abstractproperty
 from contextlib import closing
-from typing import Tuple
+from enum import Enum
+from typing import Tuple, List, Dict, Any
+
+
+class PrivacyStatus(str, Enum):
+    private = 'Private'
+    public = 'Public'
+    unlisted = 'Unlisted'
+
+
+class VideoProperty(str, Enum):
+    filepath = 'File Path'
+    title = 'Title'
+    description = 'Description'
+    tags = 'Tags'
+    category = 'Category ID'
+    privacy = 'Privacy Status'
 
 
 class BaseApi(metaclass=ABCMeta):
@@ -11,6 +27,11 @@ class BaseApi(metaclass=ABCMeta):
             s.bind(('127.0.0.1', 0))
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             return s.getsockname()[1]
+
+    @property
+    @abstractmethod
+    def supported_video_properties(self) -> List[VideoProperty]:
+        pass
 
     @property
     @abstractmethod
@@ -35,7 +56,7 @@ class BaseApi(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def run(self) -> Tuple[bool, str]:
+    def run(self, properties: Dict[VideoProperty, Any]) -> Tuple[bool, str]:
         """
         This method process the upload and returns the status and error message if failed.
 
