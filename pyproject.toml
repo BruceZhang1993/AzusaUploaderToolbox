@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "azusauploadertoolbox"
+version = "0.1.0"
+description = ""
+authors = ["Bruce Zhang <zttt183525594@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+google-api-python-client = "*"
+google-auth-oauthlib = "*"
+google-auth-httplib2 = "*"
+pydantic = "*"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
