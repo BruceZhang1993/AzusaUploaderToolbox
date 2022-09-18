@@ -21,6 +21,12 @@ class VideoProperty(str, Enum):
 
 
 class BaseApi(metaclass=ABCMeta):
+    def __init__(self, progress_cb):
+        self._cb = progress_cb
+
+    def update_progress(self, properties, progress: float):
+        self._cb(properties, progress)
+
     @staticmethod
     def find_free_port():
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
@@ -30,7 +36,12 @@ class BaseApi(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def supported_video_properties(self) -> List[VideoProperty]:
+    def supported_video_properties(self) -> List[Tuple[VideoProperty, Any]]:
+        """
+        Returns supported properties and its default value if available
+
+        :return:
+        """
         pass
 
     @property

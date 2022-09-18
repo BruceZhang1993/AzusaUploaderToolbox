@@ -23,7 +23,8 @@ class YoutubeApi(BaseApi):
     ]
     TOKEN_FILE = CACHE_DIR / 'youtube-credentials.json'
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super(YoutubeApi, self).__init__(*args, **kwargs)
         self.credentials: Optional[Credentials] = None
         self.youtube: Optional[Resource] = None
 
@@ -39,25 +40,30 @@ class YoutubeApi(BaseApi):
         return self.TOKEN_FILE.exists()
 
     @property
-    def supported_video_properties(self) -> List[VideoProperty]:
-        return [VideoProperty.title, VideoProperty.description, VideoProperty.tags, VideoProperty.category,
-                VideoProperty.privacy]
+    def supported_video_properties(self) -> List[Tuple[VideoProperty, Any]]:
+        return [
+            (VideoProperty.title, None),
+            (VideoProperty.description, None),
+            (VideoProperty.tags, []),
+            (VideoProperty.category, '22'),
+            (VideoProperty.privacy, PrivacyStatus.unlisted),
+        ]
 
     def run(self, properties: Dict[VideoProperty, Any]) -> Tuple[bool, str]:
         try:
             body = {
                 'snippet': {
-                    'title': properties.get(VideoProperty.title, ''),
-                    'description': properties.get(VideoProperty.description, ''),
+                    'title': properties.get(VideoProperty.title),
+                    'description': properties.get(VideoProperty.description),
                     'tags': properties.get(VideoProperty.tags, []),
-                    'categoryId': properties.get(VideoProperty.category),
+                    'categoryId': properties.get(VideoProperty.category, '22'),
                     'defaultLanguage': 'zh_CN',
                 },
                 'status': {
                     'privacyStatus': 'unlisted'
                 }
             }
-            match properties.get(VideoProperty.privacy):
+            match properties.get(VideoProperty.privacy, PrivacyStatus.unlisted):
                 case PrivacyStatus.public:
                     body['status']['privacyStatus'] = 'public'
                 case PrivacyStatus.private:
@@ -65,13 +71,15 @@ class YoutubeApi(BaseApi):
             request = self.youtube.videos().insert(
                 part='snippet,status',
                 body=body,
-                media_body=MediaFileUpload(properties.get(VideoProperty.filepath, ''), resumable=True)
+                media_body=MediaFileUpload(properties.get(VideoProperty.filepath, ''), resumable=True,
+                                           chunksize=300 * 1024)
             )
+            print(request)
             response = None
             while response is None:
                 status, response = request.next_chunk()
                 if status:
-                    print(status.progress() * 100)
+                    self.update_progress(properties, status.progress)
             print(response)
             return True, 'success'
         except Exception as e:
@@ -100,12 +108,15 @@ class YoutubeApi(BaseApi):
 
 
 if __name__ == '__main__':
-    api = YoutubeApi()
+    def cb(properties, progress):
+        print(properties, progress)
+
+    api = YoutubeApi(cb)
     if api.has_credentials:
         api.load_credentials()
         print(api.run({
-            VideoProperty.filepath: 'C:\\Users\\bruce\\Documents\\小海梓模型配布\\out.avi',
-            VideoProperty.title: 'azi',
+            VideoProperty.filepath: 'C:\\Users\\bruce\\Videos\\18 - 18 小背篓.flv',
+            VideoProperty.title: 'azi test',
             VideoProperty.description: 'test video upload',
             VideoProperty.tags: ['azusa'],
             VideoProperty.privacy: PrivacyStatus.private,
